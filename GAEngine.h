@@ -29,6 +29,7 @@ class Genome
         bool m_Valid;
 
     public:
+		// constructors & destructors
         Genome():m_Fitness(0.0),m_Valid(true)
         {
         }
@@ -39,6 +40,8 @@ class Genome
         ~Genome()
         {
         }
+
+		// assignment operator
         Genome operator=(const Genome& other)
         {
             if(&other!=this)
@@ -49,17 +52,19 @@ class Genome
              }
             return *this;
         }
+
+		// allele
         double allele(const std::wstring& name)
         {
             ALLELE::iterator it=find_if(m_Alleles.begin(),m_Alleles.end(),
-                   bind1st(pair_equal_to<std::wstring,double>(),name));
-            return (it==m_Alleles.end()?double(0.0):it->second);
+                   bind1st(pair_equal_to<std::wstring,double>(),name));		// pair_equal_to argument std::wstring& ?
+            return (it==m_Alleles.end()?double(0.0):it->second);			// returns 0.0 if name not found and m_Alleles' second value if found 
         }
         double allele(int index)
         {
-            return (index>=0 && index<m_Alleles.size()?m_Alleles[index].second:0.0);
+            return ((index>=0 && index<m_Alleles.size())?m_Alleles[index].second:0.0);	// second val of ith pair of m_Alleles; if index out of range, 0.0
         }
-        void allele(const std::wstring& name,double val)
+        void allele(const std::wstring& name,double val)		// if m_Alleles has an element with first==name, assign the second to val; push_back <name,val> into m_Allele
         {
             ALLELE::iterator it=find_if(m_Alleles.begin(),m_Alleles.end(),
                    bind1st(pair_equal_to<std::wstring,double>(),name));
@@ -68,32 +73,46 @@ class Genome
             else
                m_Alleles.push_back(std::make_pair<std::wstring,double>(std::wstring(name),double(val)));
         }
-        void allele(int index,double val)
+        void allele(int index,double val)		// assigns the second memb of the i(ndex)th elem of m_Alleles to val, if in range
         {
             if(index>=0 && index<m_Alleles.size())
                m_Alleles[index].second=val;
         }
-        bool valid() const { return m_Valid; }
-        void valid(bool b) { m_Valid=b; }
 
+		// valid
+        bool valid() const { return m_Valid; }
+        void valid(bool b) { m_Valid=b; }		// assign m_Valid member to b
+
+		// name
         std::wstring name(int index)
         {
+			// rts first memb of ith elem of m_Alleles; if index out of range, an empty string
             return ((index>=0 && index<m_Alleles.size())?m_Alleles[index].first:std::wstring());
         }
+
+		// size
         int size()
-        {
+        {	
+			// rts the size of m_Alleles memb vector
             return m_Alleles.size();
         }
+
+		// [] operator (indexing)
         std::pair<std::wstring,double>& operator[](int index)
-        {
+        {	// pushback <emptystr, 0.0> to m_Alleles until vect index is in range, then return ith elem of m_Alleles (pair)
              while(m_Alleles.size()<=index)
                 m_Alleles.push_back(std::make_pair(std::wstring(),double(0.0)));
              return m_Alleles[index];
         }
+
+		// fitness
         double fitness() const { return m_Fitness; }
-        void fitness(double v) { m_Fitness=v; m_Valid=(v!=INFINITY); }
-        bool operator<(const Genome& other) const
+        void fitness(double v) { m_Fitness=v; m_Valid=(v!=INFINITY); }		// assigns v to m_Fitness, m_Valid set to finity of v
+        
+		// </>/== operators (comparator) : Compares the fitness() memb fun of Genomes
+		bool operator<(const Genome& other) const
         {
+			// returns fitness() < other.fitness(); if at least one invalid, returns this->valid()
             if(valid() && other.valid())
                 return fitness()<other.fitness();
             return valid();
@@ -110,11 +129,17 @@ class Genome
                 return fitness()==other.fitness();
             return false;
         }
+
+		// same
         bool same(const Genome& other) const
         {
-            if(!valid() & other.valid())
+            /*if(!valid() & other.valid())		// ??? bitwise & on bools
                 return false;
-            if(other.m_Alleles.size()!=m_Alleles.size())
+            */
+			if(!valid() && other.valid())
+				return false;
+
+			if(other.m_Alleles.size()!=m_Alleles.size())
                 return false;
             for(int i=0;i<m_Alleles.size();i++)
             {
@@ -124,24 +149,32 @@ class Genome
             }
             return true;
         }
+
+		// var
         void var(VariablesHolder& v)
         {
+			// 'update' all alleles in m_Alleles to m_Vars in v
             for(ALLELE::iterator it=m_Alleles.begin();it!=m_Alleles.end();++it)
             {
                 v(it->first,it->second);
             }
         }
+
+		// set
         void set(VariablesHolder& v)
         {
-            m_Alleles.clear();
+			// rebuild m_Alleles from m_Vars of v
+
+            m_Alleles.clear();	// clear m_Alleles vector
+			// m_Alleles is an empty vector of pair
 
             for(int k=0;;k++)
             {
-	        std::wstring name=v.name(k);
-	        if(name.empty())
-	           break;
+				std::wstring name=v.name(k);
+				if(name.empty())	// k reached the end of m_Var in v
+					break;
 
-                m_Alleles.push_back(std::make_pair<std::wstring,double>(name,v(name)));
+                m_Alleles.push_back(std::make_pair<std::wstring,double>(name,v(name)));		// append a pair made from m_Vars of v to m_Alleles
             }
         }
 };
@@ -193,22 +226,27 @@ class GAEngine
             m_Population.resize(max_population);
         }
 
+
+		// Initialise
         bool Initialise()
         {
+			// Initialises the m_Population for GA
             Genome v;
 
             
-            if(!m_Population.size() || !m_AlleleList.size())
+            if(!m_Population.size() || !m_AlleleList.size())	// !(int)b is equivalent to (b == 0)
                 return false;
 
-	    for(typename std::vector<std::wstring>::iterator it=m_AlleleList.begin();it!=m_AlleleList.end();++it)
-	    {
-                v.allele(*it,(double)0.0);
-	    }
+			// m_Population and m_AlleleList are non-empty
+			for(typename std::vector<std::wstring>::iterator it=m_AlleleList.begin();it!=m_AlleleList.end();++it)	// typename trick to initialise an iterator variable it
+			{
+				// append each pair<wstring,0> to allele of v (storage of m_AlleleList in v)
+				v.allele(*it,(double)0.0);
+			}
             for(int i=0;i<m_Population.size();i++)
             {
-                mutate(std::wstring(),v,true);
-                m_Population[i]=v;
+                mutate(std::wstring(),v,true);	// mutate-all
+                m_Population[i]=v;				// fill m_Population with randomly mutated Genomes
             }
             return true;
         }
@@ -221,6 +259,9 @@ class GAEngine
         {
             m_Limits[name]=std::make_pair(double(lower),double(upper));
         }
+		
+		// var_template
+		// store in a VarHolder the template allele name list
         void var_template(VariablesHolder& v)
         {
             for(std::vector<std::wstring>::iterator it=m_AlleleList.begin();it!=m_AlleleList.end();++it)
@@ -229,12 +270,15 @@ class GAEngine
             }
         }
 
+		// GetBest
         double GetBest(VariablesHolder& v)
         {
             v=m_bestVariables;
             return m_bestFitness;
         }
 
+		// var_to_workitem
+		// returns a pointer to a new WorkItem that has collated h's m_Vars second values
         WorkItem *var_to_workitem(VariablesHolder& h)
         {
             WorkItem *w=new WorkItem;
@@ -243,6 +287,8 @@ class GAEngine
             return w;
         }
 
+		// process_workitem
+		// assigns the key-th Genome of m_Pop's m_fitness to answer, and deletes the WorkItem
         void process_workitem(WorkItem *w,double answer)
         {
             if(w->key<m_Population.size())
@@ -253,6 +299,7 @@ class GAEngine
             delete w;
         }
 
+		// RunGenerations
         void RunGenerations(int gener)
         {
             VariablesHolder v;
@@ -260,40 +307,44 @@ class GAEngine
             m_Generations=gener;
 
             //Create initial fitness set
-	    for(int i=0;i<m_Population.size();i++)
-	    {
-		Genome& g=m_Population[i];
+			for(int i=0;i<m_Population.size();i++)
+			{
+				Genome& g=m_Population[i];
 
-		g.var(v);
-		WorkItem *w=var_to_workitem(v);
-		w->key=i;
-		Distributor::instance().push(w);
-	    }
-	    Distributor::instance().process(observer,this);
-	    std::sort(m_Population.begin(),m_Population.end(),reverse_compare);
-            if(!m_bBestFitnessAssigned || m_bestFitness>m_Population[0].fitness())
+				g.var(v);		// 'update' all alleles of g into v
+				WorkItem *w=var_to_workitem(v);
+				w->key=i;
+				Distributor::instance().push(w);				//??
+			}
+			Distributor::instance().process(observer,this);		//??
+			std::sort(m_Population.begin(),m_Population.end(),reverse_compare);		// sort m_Population (vector<Genome>) by reverse_compare: in ascending order of fitness
+            // check if best ftns is assigned. if not, assign it	(fitness minimisation!)
+			if(!m_bBestFitnessAssigned || m_bestFitness>m_Population[0].fitness())
             {
-                m_bestFitness=m_Population[0].fitness();
-                m_Population[0].var(m_bestVariables);
+                m_bestFitness=m_Population[0].fitness();	// assign min ftns as the best fitness
+                m_Population[0].var(m_bestVariables);		// update the bestVars
                 m_bBestFitnessAssigned=true;
             }
 
-            print_stage(-1);
+            print_stage(-1);		// -1??
 
             for(int g=0;g<gener;g++)
             {
-		//Do the genetics
-	        int limit=m_Population.size();
+				//Do the genetics
+				int limit=m_Population.size();
                 //Create new population
-                POPULATION prev(m_Population);
+                POPULATION prev(m_Population);		// prev is a copy of current pop vector
  
-                m_Population.clear();
+                m_Population.clear();		// clear current population vector
                 double l=(double)prev.size()-0.5;
+
+				// SELECTION
+				// select Genomes from prev gen to carry on; store in m_Population vector
                 for(int i=0;i<limit;i++)
                 {
-                    int mem=select_weighted(prev);
+                    int mem=select_weighted(prev);		// mem is the randomly selected Genome's index (p.size()-1 when err)
                     //printf("Adding %d to population\n",mem);
-                    m_Population.push_back(prev[mem]);
+                    m_Population.push_back(prev[mem]);	// append the selected Genome into curr Pop vector
                 }
 
 
@@ -382,18 +433,18 @@ class GAEngine
             {
                 printf("--------------------------------------------------------\n");
                 for(int j=0;j<m_Population.size();j++)
-	        {
+				{
                     VariablesHolder v;
  
                     printf("%s[%d](%lf) ",(m_Population[j].valid()?" ":"*"),g+1,m_Population[j].fitness());
                     for(int k=0;;k++)
                     {
                         m_Population[j].var(v);
-	                std::wstring name=v.name(k);
+						std::wstring name=v.name(k);
                                
-	    	        if(name.empty())
-			    break;
-			printf("%s=%lf   ",convert(name).c_str(),v(name));
+	    				if(name.empty())
+							break;
+						printf("%s=%lf   ",convert(name).c_str(),v(name));
                     }
                     printf("\n");
                 }
@@ -404,30 +455,30 @@ class GAEngine
                  VariablesHolder v;
 
                  double f=GetBest(v);
-	         printf("Generation %d. Best fitness: %lf\n",g+1,f);
-		 for(int k=0;;k++)
-		 {
-		     std::wstring name=v.name(k);
-		     if(name.empty())
-		         break;
-		     printf("%s=%lf    ",convert(name).c_str(),v(name));
-		 }
+				 printf("Generation %d. Best fitness: %lf\n",g+1,f);
+				 for(int k=0;;k++)
+				 {
+					 std::wstring name=v.name(k);
+					 if(name.empty())
+						 break;
+					 printf("%s=%lf    ",convert(name).c_str(),v(name));
+				 }
                  printf("\n");
                  printf("--------------------------------------------------------\n");
-              }
+             }
         }
 
         void mutate(const std::wstring& name,Genome& g,bool mutate_all=false)
         {
-            double prob=(mutate_all?101.0:100.0/g.size());
+            double prob=(mutate_all?101.0:100.0/g.size());		// 100.0/g.size() ????
 
             for(int i=0;i<g.size();i++)
             {
-                double p=rnd_generate(0.0,100.0);
+                double p=rnd_generate(0.0,100.0);	// where is rnd_generate?
                 
-                if(p>prob)
+                if(p>prob)			// skip code below: eveytime if mutate_all==true, 100.0/g.size() % if false (approx skipped just once?)
                    continue;
-                if(!name.size() || g.name(i)==name)
+                if(!name.size() || g.name(i)==name)		// if name is non-emtpy wstring, only the allele with matching name may be mutated
                 {
                     LIMITS::iterator it=m_Limits.find(g.name(i));
                     double val;
@@ -438,11 +489,12 @@ class GAEngine
                     }
                     else
                     {
+						// restrict RNG to set limits
                         val=rnd_generate(it->second.first,it->second.second);
                     }
                     g.allele(i,val);
 
-                    if(name.size())
+                    if(name.size())		// stop mutation if name is non-emtpy (only mutated one allele)
                         break;
                 }
             }
@@ -568,21 +620,27 @@ class GAEngine
                     sample.push_back(i);
             }
         }
+
+		// select_weighted
         int select_weighted(POPULATION& p)
         {
             double limit=(double)p.size()-0.5;
             double sum=0.0;
 
+			// total sum of population's fitness	(sum is inf if p[i].fitness == 0 or p[i] invalid)
             for(int i=0;i<p.size();i++)
-                sum+=(p[i].valid()?1.0/(p[i].fitness()?p[i].fitness():0.000000000001):99999999999.99999);
+                sum+=(p[i].valid()?1.0/(p[i].fitness()?p[i].fitness():0.000000000001):99999999999.99999);		// !!!shouldn't summand be 0 if p[i] invalid?
+				// sum+=(p[i].valid()?1.0/(p[i].fitness()?p[i].fitness():0.000000000001):0.0);
 
+			// use a randomly selected threshold for cum-sum to select i
             double choice=sum*rnd_generate(0.0,1.0);
             for(int i=0;i<p.size();i++)
             {
                 choice-=1.0/(p[i].fitness()?p[i].fitness():0.000000000001);
                 if(choice<=0.0)
-                     return i;
+					return i;
             }
+			// choice is larger than cum-sum
             return p.size()-1;
         }
 };
