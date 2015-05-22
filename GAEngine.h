@@ -99,10 +99,11 @@ class Genome
 
 		// [] operator (indexing)
         std::pair<std::wstring,double>& operator[](int index)
-        {	// pushback <emptystr, 0.0> to m_Alleles until vect index is in range, then return ith elem of m_Alleles (pair)
-             while(m_Alleles.size()<=index)
-                m_Alleles.push_back(std::make_pair(std::wstring(),double(0.0)));
-             return m_Alleles[index];
+        {	
+			// pushback <emptystr, 0.0> to m_Alleles until vector index is in range, then return that elem of m_Alleles
+            while(m_Alleles.size()<=index)
+				m_Alleles.push_back(std::make_pair(std::wstring(),double(0.0)));
+			return m_Alleles[index];
         }
 
 		// fitness
@@ -151,9 +152,9 @@ class Genome
         }
 
 		// var
+		// 'update' all alleles of this genome to v
         void var(VariablesHolder& v)
         {
-			// 'update' all alleles in m_Alleles to m_Vars in v
             for(ALLELE::iterator it=m_Alleles.begin();it!=m_Alleles.end();++it)
             {
                 v(it->first,it->second);
@@ -163,7 +164,7 @@ class Genome
 		// set
         void set(VariablesHolder& v)
         {
-			// rebuild m_Alleles from m_Vars of v
+			// rebuild alleles from that stored in a varholder
 
             m_Alleles.clear();	// clear m_Alleles vector
 			// m_Alleles is an empty vector of pair
@@ -351,68 +352,79 @@ class GAEngine
                 //Do the crossovers
                 if(m_crossPartition)
                 {
-                    std::vector<int> sample;
+                    std::vector<int> sample;	// initialise an integer vector
 
                     if(!m_UseBlockSample)
-                        build_rnd_sample_rnd(sample,m_CrossProbability*100.0,true);
+                        build_rnd_sample_rnd(sample,m_CrossProbability*100.0,true);		// fill sample with indices to perform crossover
                     else
-                        build_rnd_sample(sample,m_crossPartition,true,true); //disallow duplicates
+                        build_rnd_sample(sample,m_crossPartition,true,true);			// disallow duplicates in building sample (size m_crossPartition)
+
                     for(int i=0;i<sample.size();i++)
                     {
-                        std::vector<int> arena; //arena for breeding
+                        std::vector<int> arena; //initialise arena for breeding
                         
-                        arena.push_back(sample[i]); //avoid self for crossbreeding
-                        build_rnd_sample(arena,1,true,true); //build tournament sample
-	    	        cross(m_Population[arena[0]],m_Population[arena[1]],
-                              (int)rnd_generate(1.0,m_Population[sample[i]].size()));
+                        arena.push_back(sample[i]);	//ith sample enters arena 
+						//bulid tournament sample
+                        build_rnd_sample(arena,1,true,true); //another sample enters arena, avoid self for crossbreeding
+
+						//cross the Genomes in arena at a randomly selected crosspoint
+	    				cross(m_Population[arena[0]],m_Population[arena[1]],
+							(int)rnd_generate(1.0,m_Population[sample[i]].size()));		//crosspoint in [1,allele length of ith sample genome]
 
                         for(int j=0;j<2;j++)
                         {
-			    m_Population[arena[j]].var(v);
+							m_Population[arena[j]].var(v);
                             Distributor::instance().remove_key(arena[j]); //remove previously requested processing
-			    WorkItem *w=var_to_workitem(v);
-			    w->key=arena[j];
-			    Distributor::instance().push(w);
+							WorkItem *w=var_to_workitem(v);
+							w->key=arena[j];
+							Distributor::instance().push(w);
                         }
                     }
                 }
+
+
                 //Do the mutations
                 if(m_mutatePartition)
                 {
                     std::vector<int> sample;
 
                     if(!m_UseBlockSample)
-                        build_rnd_sample_rnd(sample,m_MutationProbability*100.0,false);
+                        build_rnd_sample_rnd(sample,m_MutationProbability*100.0,false);	//sample vector includes even invalid Genomes
                     else
-                        build_rnd_sample(sample,m_mutatePartition,false,false); //allow duplicates
+                        build_rnd_sample(sample,m_mutatePartition,false,false); //allow duplicates and invalid genomes to build sample (size m_mutatePartition)
 
-                    //Mutate invalid population members
+					//Treatment of invalid genomes in the population
                     for(int i=0;i<m_Population.size();i++)
                     {
-                         if(!m_Population[i].valid() && std::find(sample.begin(),sample.end(),i)==sample.end())
-                             sample.push_back(i);
+						//add all unselected invalid genomes into sample
+						if(!m_Population[i].valid() && std::find(sample.begin(),sample.end(),i)==sample.end())
+							sample.push_back(i);
                     }
+
+					//Mutate invalid population members
                     for(int i=0;i<sample.size();i++)
                     {
-	    	        mutate(std::wstring(),m_Population[sample[i]],!m_Population[sample[i]].valid());
-			m_Population[sample[i]].var(v);
+	    				mutate(std::wstring(),m_Population[sample[i]],!(m_Population[sample[i]].valid()));	// mutate-all iff genome is invalid. else mutate approx 1 allele
+						m_Population[sample[i]].var(v);
                         Distributor::instance().remove_key(sample[i]); //remove previously requested processing
-			WorkItem *w=var_to_workitem(v);
-                        m_Population[sample[i]].set(v);
-			w->key=sample[i];
-			Distributor::instance().push(w);
+						WorkItem *w=var_to_workitem(v);
+                        m_Population[sample[i]].set(v);		//??
+						w->key=sample[i];
+						Distributor::instance().push(w);
                     }
                 }
-		//Run the distribution
-		Distributor::instance().process(observer,this);
-		std::sort(m_Population.begin(),m_Population.end(),reverse_compare);
+
+				//Run the distribution
+				Distributor::instance().process(observer,this);
+				std::sort(m_Population.begin(),m_Population.end(),reverse_compare);
 
                 if(m_Population.size()>m_MaxPopulation)
                 {
-                      //Cull it
-                      m_Population.erase(m_Population.begin()+m_MaxPopulation,m_Population.end());
+                    //Cull it
+					m_Population.erase(m_Population.begin()+m_MaxPopulation,m_Population.end());
                 }
- 
+				
+				// update best fitness
                 if(!m_bBestFitnessAssigned || m_bestFitness>m_Population[0].fitness())
                 {
                     m_bestFitness=m_Population[0].fitness();
@@ -468,19 +480,31 @@ class GAEngine
              }
         }
 
+		// mutate
         void mutate(const std::wstring& name,Genome& g,bool mutate_all=false)
         {
-            double prob=(mutate_all?101.0:100.0/g.size());		// 100.0/g.size() ????
+            double prob=(mutate_all?101.0:100.0/g.size());
 
             for(int i=0;i<g.size();i++)
             {
                 double p=rnd_generate(0.0,100.0);	// where is rnd_generate?
                 
-                if(p>prob)			// skip code below: eveytime if mutate_all==true, 100.0/g.size() % if false (approx skipped just once?)
+				// mutate if ( p <= prob )
+                if(p>prob)		// chance to skip mutation
                    continue;
-                if(!name.size() || g.name(i)==name)		// if name is non-emtpy wstring, only the allele with matching name may be mutated
+
+				/*
+				 *	Mutation rate (%):
+				 *		100					if mutate_all == true		i.e. mutate all allele
+				 *		100.0/g.size()		if mutate_all == false		i.e. mutate approx. just 1 allele		
+				 */
+
+
+				// if name is non-emtpy wstring, only the allele with matching name may be mutated
+					//if name is empty wstring mutate all alleles
+                if(!name.size() || g.name(i)==name)		
                 {
-                    LIMITS::iterator it=m_Limits.find(g.name(i));
+                    LIMITS::iterator it=m_Limits.find(g.name(i));	// check for param limits of this allele
                     double val;
                     if(it==m_Limits.end())
                     {
@@ -492,13 +516,14 @@ class GAEngine
 						// restrict RNG to set limits
                         val=rnd_generate(it->second.first,it->second.second);
                     }
-                    g.allele(i,val);
+                    g.allele(i,val);	// set the RNG value to allele
 
                     if(name.size())		// stop mutation if name is non-emtpy (only mutated one allele)
                         break;
                 }
             }
         }
+
         void mutate(double probability,Genome& g,int count=-1)
         {
             int cnt=0;
@@ -526,6 +551,8 @@ class GAEngine
                 }
             }
         }
+
+		// cross
         bool cross(Genome& one,Genome& two,int crosspoint,Genome& out)
         {
             if(one.size()!=two.size() || one.size()<crosspoint+1)
@@ -540,9 +567,12 @@ class GAEngine
         {
             Genome n1,n2;
 
+			// check if genomes' alleles have same size and crosspoint lies in valid range
             if(one.size()!=two.size() || one.size()<crosspoint+1)
                 return false;
 
+			// genomes same size and valid crosspoint
+			// swap the alleles before crosspoint
             for(int i=0;i<crosspoint;i++)
             {
                 n1[i]=two[i];
@@ -560,25 +590,32 @@ class GAEngine
 
             return true;
         }
+
+		// build_rnd_sample
         void build_rnd_sample(std::vector<int>& sample,int count,bool reject_duplicates,bool check_valid)
         {
             double limit=(double)m_Population.size()-0.5;
 
+			// append "count" number of randomly selected integers (index for m_Pop) onto sample
             for(;count>0;count--)
             {
                 int v;
 
+				// do-while loop: randomly assign an int to v 
+					// if reject_duplicates true, build_rnd_sample will not add duplicates to sample
                 do
                 {
-                    v=(int)(rnd_generate(0.0,limit));
+					v=(int)(rnd_generate(0.0,limit));	// v in [0, m_Pop.size()-1]
                     if(check_valid && !m_Population[v].valid())
-                       continue;
+						continue;		//??if check_valid true, loop until v is a valid Genome? 
+						//(BUG - invalid genomes will still be pushed back onto sample)
                 }
                 while(reject_duplicates && std::find(sample.begin(),sample.end(),v)!=sample.end());
                 //Found next value
-                sample.push_back(v);
+                sample.push_back(v);	// push onto sample vector
             }
         }
+		
         void build_rnd_sample_tournament(std::vector<int>& sample,int count,bool reject_duplicates,bool check_valid)
         {
             double limit=(double)m_Population.size()-0.5;
@@ -611,9 +648,12 @@ class GAEngine
                     sample.erase(sample.begin()+i+1);
             }     
         }
+
+		// build_rnd_sample_rnd
         void build_rnd_sample_rnd(std::vector<int>& sample,double prob,bool check_valid)
         {
-
+			// if check_valid, only appends indices of m_Population for which Genomes are valid, at given probability (%)
+			// if false (check_valid), appends Genomes at given rate (%)
             for(int i=0;i<m_Population.size();i++)
             {
                 if((!check_valid || m_Population[i].valid()) && prob>=rnd_generate(0.0,100.0))
@@ -629,7 +669,7 @@ class GAEngine
 
 			// total sum of population's fitness	(sum is inf if p[i].fitness == 0 or p[i] invalid)
             for(int i=0;i<p.size();i++)
-                sum+=(p[i].valid()?1.0/(p[i].fitness()?p[i].fitness():0.000000000001):99999999999.99999);		// !!!shouldn't summand be 0 if p[i] invalid?
+                sum+=(p[i].valid()?1.0/(p[i].fitness()?p[i].fitness():0.000000000001):99999999999.99999);		// !!!shouldn't summand be 0 if p[i] invalid? (BUG?)
 				// sum+=(p[i].valid()?1.0/(p[i].fitness()?p[i].fitness():0.000000000001):0.0);
 
 			// use a randomly selected threshold for cum-sum to select i
