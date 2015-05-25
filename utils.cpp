@@ -21,13 +21,14 @@ std::string convert(const std::wstring& wstr)
 std::wstring convert(const std::string& str)
 {
     //wstring wstr(str.begin(),str.end());
-    std::wstring wstr(str.size(), L' '); 
+    std::wstring wstr(str.size(), L' ');	// str.size() copies of L' '
     wstr.resize(mbstowcs(&wstr[0], str.c_str(), str.size()));
 
     return wstr;
 }
 
-
+// rnd_generate
+// generates a random double in [min,max]
 double rnd_generate(double min, double max)
 {
     double r = (double)rand() / (double)RAND_MAX;
