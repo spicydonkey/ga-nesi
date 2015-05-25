@@ -13,36 +13,56 @@
 
 #define COMP_FUNC std::less_equal<double>
 
+// define ALLELE as vector of <wstring, double> pairs
 typedef std::vector<std::pair<std::wstring,double> > ALLELE;
 
+
+/**
+ *	VariablesHolder
+ *	
+ *	+ m_Vars : ALLELE
+ *	
+ *	
+ **/
 class VariablesHolder
 {
     public:
 	VariablesHolder() {}
-	VariablesHolder(const VariablesHolder& other) { m_Vars.assign(other.m_Vars.begin(),other.m_Vars.end()); }
+	VariablesHolder(const VariablesHolder& other) { m_Vars.assign(other.m_Vars.begin(),other.m_Vars.end()); }	//copy other VarHolder's variables into this one
 	~VariablesHolder() {}
+
+	// = assign other VarHold to this if different 
 	VariablesHolder& operator=(const VariablesHolder& other)
 	{
 	    if(&other!=this)
 	       m_Vars.assign(other.m_Vars.begin(),other.m_Vars.end());
 	    return *this;
 	}
-	double operator()(const std::wstring& name) 
-	{ 
-	    ALLELE::iterator it=find_if(m_Vars.begin(),m_Vars.end(),
-		      bind1st(pair_equal_to<std::wstring,double>(),name));
-	    return (it==m_Vars.end()?double(0.0):it->second);
-	}
-	double operator()(const std::wstring& name,double val)
+
+	//indexing VarHold obj by name:value in m_Vars
+	double operator()(const std::wstring& name)
 	{
 	    ALLELE::iterator it=find_if(m_Vars.begin(),m_Vars.end(),
+		      bind1st(pair_equal_to<std::wstring,double>(),name));	//find iterator to the pair in m_Vars for which the "first" member equals name (end if no such pair)
+	    return (it==m_Vars.end()?double(0.0):it->second);
+	}
+
+	//Update an allele (pair) in VarHold's m_Var obj and return updated allele value
+	double operator()(const std::wstring& name,double val)
+	{
+		//find the iterator for name
+	    ALLELE::iterator it=find_if(m_Vars.begin(),m_Vars.end(),
 		   bind1st(pair_equal_to<std::wstring,double>(),name));
+
 	    if(it!=m_Vars.end())
-	       it->second=val;
+	       it->second=val;	//update the allele if it already exists
 	    else
-	       m_Vars.push_back(std::make_pair<std::wstring,double>(std::wstring(name),double(val)));
+	       m_Vars.push_back(std::make_pair<std::wstring,double>(std::wstring(name),double(val)));	//add the allele into m_Var if not stored yet
 	    return val;
 	}
+
+	// TODO
+
 	std::wstring name(int index)
 	{
 	    return ((index>=0 && index<m_Vars.size())?m_Vars[index].first:std::wstring());
@@ -62,7 +82,7 @@ class VariablesHolder
 	{
 	     for(ALLELE::iterator it=m_Vars.begin();it!=m_Vars.end();++it)
 	     {
-		 v.push_back(it->second);
+			v.push_back(it->second);
 	     }
 	}
 	void print()
