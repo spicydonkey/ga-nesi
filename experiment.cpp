@@ -42,19 +42,23 @@ char *OpenXmlFile(const char *name,long& nSize)
     FILE *f=fopen(name,"rb");
     char *pBuffer=NULL;
 
+	//check for file open error
     if(!f)
         return NULL;
-
+	
+	//obtain file size
     fseek(f,0,SEEK_END);
     nSize=ftell(f);
     fseek(f,0,SEEK_SET);
 
+	//allocate memory to contain the whole file
     pBuffer=new char[nSize+1];
 
-    fread(pBuffer,nSize,1,f);
+	//copy the file into buffer
+    fread(pBuffer,nSize,1,f);	// fread usage!?
+	//fread(pBuffer,1,nSize,f);
     pBuffer[nSize]=0;
     fclose(f);
-
 
     return pBuffer;
 }
@@ -62,6 +66,7 @@ char *OpenXmlFile(const char *name,long& nSize)
 //Initialise GA engine
 int SetAndInitEngine(GAEngine<COMP_FUNC >& ga,const AdvXMLParser::Element& elem)
 {
+	//Get GA parameters from XML file
     int initPopulation=atoi(elem.GetAttribute("InitialPopulation").GetValue().c_str());
     double mutation=atof(elem.GetAttribute("Mutation_proportion").GetValue().c_str());
     double cross=atof(elem.GetAttribute("Crossover_proportion").GetValue().c_str());
@@ -88,13 +93,13 @@ int SetAndInitEngine(GAEngine<COMP_FUNC >& ga,const AdvXMLParser::Element& elem)
     //Read alleles information
     for(int i=0;;i++)
     {
-        const AdvXMLParser::Element& al=elem("Alleles",0)("Allele",i);
+        const AdvXMLParser::Element& al=elem("Alleles",0)("Allele",i);		// what does this line do??
         std::wstring name; 
         if(al.IsNull())
            break;
         name=convert(al.GetAttribute("Name").GetValue());
         ga.AddAllele(name);
-        //Set allele limites
+        //Set allele limits
         ga.AddLimit(name,atof(al.GetAttribute("LowerBound").GetValue().c_str()),atof(al.GetAttribute("UpperBound").GetValue().c_str()));
         //Initialise variable template
         var_template(name,0.0);
