@@ -19,11 +19,12 @@ Distributor& Distributor::instance()
     return *pInstance;
 }
 
+//Distributor constructor
 Distributor::Distributor()
 {
     int nproc;
     
-    //INitialise ranks array
+    //Initialise ranks array
     MPI_Comm_size(MPI_COMM_WORLD, &nproc);
     ranks.resize(nproc);
     for(int i=0;i<nproc;i++)
