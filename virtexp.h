@@ -13,14 +13,14 @@
 
 #define COMP_FUNC std::less_equal<double>
 
-// define ALLELE as vector of <wstring, double> pairs
+// define ALLELE as vector of <wstring, double> pairs ( i.e. ALLELE is a vector of 'allele's (pair<wstr,doub>) )
 typedef std::vector<std::pair<std::wstring,double> > ALLELE;
 
 
 /**
  *	VariablesHolder
  *	
- *	+ m_Vars : ALLELE
+ *	+ m_Vars : a storage for ALLELE variable
  *	
  *	
  **/
