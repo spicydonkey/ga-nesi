@@ -327,7 +327,7 @@ class GAEngine
                 m_bBestFitnessAssigned=true;
             }
 
-            print_stage(-1);		// -1??
+            print_stage(-1);		// -1 for initial generation
 
             for(int g=0;g<gener;g++)
             {
@@ -441,14 +441,18 @@ class GAEngine
 
         void print_stage(int g)
         {
+			//verbose summary of GA: print all chromosomes of curr gen
             if(verbosity>1)
             {
                 printf("--------------------------------------------------------\n");
                 for(int j=0;j<m_Population.size();j++)
 				{
                     VariablesHolder v;
- 
+					
+					//print validity, generation #, and fitness of each chromosome
                     printf("%s[%d](%lf) ",(m_Population[j].valid()?" ":"*"),g+1,m_Population[j].fitness());
+
+					//print each chromosome's alleles (name and value)
                     for(int k=0;;k++)
                     {
                         m_Population[j].var(v);
@@ -460,25 +464,27 @@ class GAEngine
                     }
                     printf("\n");
                 }
-                printf("--------------------------------------------------------\n");
-             } 
-             else if(verbosity==1)
-             {
-                 VariablesHolder v;
+				printf("--------------------------------------------------------\n");
+			} 
+             
+			//shorter summary of GA: print currently fittest chromosome
+			else if(verbosity==1)
+			{
+				VariablesHolder v;
 
-                 double f=GetBest(v);
-				 printf("Generation %d. Best fitness: %lf\n",g+1,f);
-				 for(int k=0;;k++)
-				 {
-					 std::wstring name=v.name(k);
-					 if(name.empty())
-						 break;
-					 printf("%s=%lf    ",convert(name).c_str(),v(name));
-				 }
-                 printf("\n");
-                 printf("--------------------------------------------------------\n");
-             }
-        }
+                double f=GetBest(v);
+				printf("Generation %d. Best fitness: %lf\n",g+1,f);
+				for(int k=0;;k++)
+				{
+					std::wstring name=v.name(k);
+					if(name.empty())
+						break;
+					printf("%s=%lf    ",convert(name).c_str(),v(name));
+				}
+                printf("\n");
+                printf("--------------------------------------------------------\n");
+			}
+		}
 
 		// mutate
         void mutate(const std::wstring& name,Genome& g,bool mutate_all=false)
@@ -487,7 +493,7 @@ class GAEngine
 
             for(int i=0;i<g.size();i++)
             {
-                double p=rnd_generate(0.0,100.0);	// where is rnd_generate?
+                double p=rnd_generate(0.0,100.0);
                 
 				// mutate if ( p <= prob )
                 if(p>prob)		// chance to skip mutation
@@ -686,4 +692,3 @@ class GAEngine
 };
 
 #endif
-
