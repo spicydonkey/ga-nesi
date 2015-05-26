@@ -58,57 +58,79 @@ class VariablesHolder
 	       it->second=val;	//update the allele if it already exists
 	    else
 	       m_Vars.push_back(std::make_pair<std::wstring,double>(std::wstring(name),double(val)));	//add the allele into m_Var if not stored yet
-	    return val;
+	    
+		return val;	//return updated allele value
 	}
 
-	// TODO
-
+	//Index search allele name
 	std::wstring name(int index)
 	{
+		//return the name of allele at the index location of allele vector m_Vars (nullwstr if index out of range)
 	    return ((index>=0 && index<m_Vars.size())?m_Vars[index].first:std::wstring());
 	}
 
 	bool exists(const std::wstring& name)
 	{
+		//return existence of allele of given name in m_Vars vector
 	    ALLELE::iterator it=find_if(m_Vars.begin(),m_Vars.end(),
 		   bind1st(pair_equal_to<std::wstring,double>(),name));
 	    return (it!=m_Vars.end());
 	}
-        size_t size()
-        {
-            return m_Vars.size();
-        }
+
+	//Size of a VariablesHolder object
+    size_t size()
+    {
+		//is the size of m_Vars vector i.e. number of alleles in stored in the m_Vars vector
+        return m_Vars.size();
+    }
+
+	//collate
+	//Pushback all allele values held in m_Vars onto a supplied ref to vect<doub>
 	void collate(std::vector<double>& v)
 	{
-	     for(ALLELE::iterator it=m_Vars.begin();it!=m_Vars.end();++it)
-	     {
+		for(ALLELE::iterator it=m_Vars.begin();it!=m_Vars.end();++it)
+		{
 			v.push_back(it->second);
-	     }
+	    }
 	}
+
+	//print all alleles held in m_Vars
 	void print()
 	{
-	     for(ALLELE::iterator it=m_Vars.begin();it!=m_Vars.end();++it)
-	     {
-		 printf("%s->%lf\n",convert(it->first).c_str(),it->second);
-	     }
+		for(ALLELE::iterator it=m_Vars.begin();it!=m_Vars.end();++it)
+	    {
+			printf("%s->%lf\n",convert(it->first).c_str(),it->second);
+		}
 	}
 
-
+	//Fill-up the allele values of m_Vars with a supplied reference to vect<doub>, v
+	//returns true iff fillup is executed properly
 	bool fillup(std::vector<double>& v)
 	{
-             if(v.size()!=m_Vars.size())
-                 return false;
-	     for(int i=0;i<v.size();i++)
-	     {
-		 m_Vars[i].second=v[i];
-	     }
-             return true;
+		//check if the sizes are equal
+		if(v.size()!=m_Vars.size())
+			return false;
+
+		//assign the second members of each allele in m_Vars
+		for(int i=0;i<v.size();i++)
+		{
+			m_Vars[i].second=v[i];
+	    }
+		return true;
 	}
 
     private:
 	ALLELE m_Vars;
 };
 
+
+
+/**
+ *	VirtualExperiment
+ *	
+ *	
+ *	
+ **/
 class VirtualExperiment
 {
     public:
