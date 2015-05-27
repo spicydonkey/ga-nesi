@@ -204,6 +204,7 @@ class GAEngine
     public:
         typedef Genome GENOME;
 
+		// default GA Engine constructor
         GAEngine():m_MaxPopulation(0),m_Generations(1),
                    m_CrossProbability(0.2),m_MutationProbability(0.01),
                    m_bBestFitnessAssigned(false),m_UseBlockSample(false),
@@ -221,6 +222,7 @@ class GAEngine
 
         bool& block_sample() { return m_UseBlockSample; }
 
+		// Set the maximum population size of GA and resize the population Genome vector accordingly
         void set_borders(int max_population)
         {
             m_MaxPopulation=max_population;
@@ -251,6 +253,8 @@ class GAEngine
             }
             return true;
         }
+
+
         int size() { return m_Population.size(); }
         void AddAllele(const std::wstring& name)
         {
@@ -692,3 +696,4 @@ class GAEngine
 };
 
 #endif
+
