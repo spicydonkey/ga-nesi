@@ -11,6 +11,8 @@
 #include <functional>
 #include <algorithm>
 
+
+// COMP_FUNC is a function object class for <= comparisons on doubles
 #define COMP_FUNC std::less_equal<double>
 
 // define ALLELE as vector of <wstring, double> pairs ( i.e. ALLELE is a vector of 'allele's (pair<wstr,doub>) )
@@ -155,6 +157,12 @@ class VirtualExperiment
 
 	private:
 
+		/**
+		 *	Runner structure
+		 *	
+		 *	+ pOwner (ptr to a VirtualExperiment)
+		 *
+		 **/
         struct Runner
         {
            Runner(VirtualExperiment *p):pOwner(p) {}
@@ -168,10 +176,12 @@ class VirtualExperiment
         double getSSRD(std::vector<std::pair<int,double> >& d);
         std::string m_strModelName;
         ObjRef<iface::cellml_api::Model> m_Model;
-        int m_nResultColumn;
-        typedef std::map<std::wstring,double> PARAMS;
-        typedef std::pair<double,double> POINT;
-        typedef std::vector<POINT> TIMEPOINTS;
+		int m_nResultColumn;
+        
+		// Type definitions
+		typedef std::map<std::wstring,double>	PARAMS;
+        typedef std::pair<double,double>		POINT;
+        typedef std::vector<POINT>				TIMEPOINTS;
 
         PARAMS m_Parameters;
         TIMEPOINTS m_Timepoints;
