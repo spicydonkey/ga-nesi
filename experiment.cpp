@@ -28,7 +28,7 @@ ObjRef<iface::cellml_services::CellMLIntegrationService> cis;
 
 VariablesHolder var_template; //template for the variables, just holds names of the variables
 
-int verbosity=0;
+int verbosity=0;	// verbosity initialised to 0
 
 void usage(const char *name)
 {
@@ -37,10 +37,12 @@ void usage(const char *name)
 }
 
 //Open and read XML configuration file
+//nSize is assigned the size of file
+//return the contents of the file as a null-terminated char array
 char *OpenXmlFile(const char *name,long& nSize)
 {
-    FILE *f=fopen(name,"rb");
-    char *pBuffer=NULL;
+    FILE *f=fopen(name,"rb");	// open file "name" for reading
+    char *pBuffer=NULL;	// initialise a buffer for storing C-string to a nullptr
 
 	//check for file open error
     if(!f)
@@ -54,16 +56,18 @@ char *OpenXmlFile(const char *name,long& nSize)
 	//allocate memory to contain the whole file
     pBuffer=new char[nSize+1];
 
-	//copy the file into buffer
-    fread(pBuffer,nSize,1,f);	// fread usage!?
+	
+    fread(pBuffer,nSize,1,f);	//copy the file into buffer (usage of fread)
 	//fread(pBuffer,1,nSize,f);
-    pBuffer[nSize]=0;
+    
+	pBuffer[nSize]=0;	// null terminate the char array buffer
     fclose(f);
 
     return pBuffer;
 }
 
 //Initialise GA engine
+	//return number of generations to run GA
 int SetAndInitEngine(GAEngine<COMP_FUNC >& ga,const AdvXMLParser::Element& elem)
 {
 	//Get GA parameters from XML file
@@ -74,10 +78,9 @@ int SetAndInitEngine(GAEngine<COMP_FUNC >& ga,const AdvXMLParser::Element& elem)
     int block_sample=atoi(elem.GetAttribute("Sampling").GetValue().c_str());
     
 
-    //Set defaults for uninitialised variables
+    //Set the parameters for the GA engine accordingly
     if(!initPopulation)
-        initPopulation=100;
-
+        initPopulation=100;		// default population size if in XML it is undeclared or 0
     if(cross>1.0)
         cross=1.0;
     if(mutation>1.0)
@@ -93,31 +96,37 @@ int SetAndInitEngine(GAEngine<COMP_FUNC >& ga,const AdvXMLParser::Element& elem)
     //Read alleles information
     for(int i=0;;i++)
     {
-        const AdvXMLParser::Element& al=elem("Alleles",0)("Allele",i);		// what does this line do??
-        std::wstring name; 
+        const AdvXMLParser::Element& al=elem("Alleles",0)("Allele",i);		// assign to "al" the ith Allele sub-element of the (first) Alleles element in "elem"
+        std::wstring name;
         if(al.IsNull())
-           break;
-        name=convert(al.GetAttribute("Name").GetValue());
-        ga.AddAllele(name);
-        //Set allele limits
+           break;	// exhaustively iterate through the "Allele" sub-elements of Alleles
+        name=convert(al.GetAttribute("Name").GetValue());	// get the String value for Name attribute in "al" allele sub-element; convert it to wstring and store in name
+        // Add allele
+		ga.AddAllele(name);	
+        // Set allele limits
         ga.AddLimit(name,atof(al.GetAttribute("LowerBound").GetValue().c_str()),atof(al.GetAttribute("UpperBound").GetValue().c_str()));
-        //Initialise variable template
+        // Initialise variable template
         var_template(name,0.0);
     }
-    ga.set_borders(initPopulation);
-    return (generations?generations:1);
+    ga.set_borders(initPopulation);		// set max population of GA
+
+	// return the num of generations to run GA
+    return (generations?generations:1);	// default number of generations to run is 1
 }
 
+
+//Initialise the template variable holder with Alleles sub-element
 void initialize_template_var(const AdvXMLParser::Element& elem)
 {
     for(int i=0;;i++)
     {
-        const AdvXMLParser::Element& al=elem("Alleles",0)("Allele",i);
+        const AdvXMLParser::Element& al=elem("Alleles",0)("Allele",i);	// assign to "al" the ith Allele sub-element of the (first) Alleles element in "elem"
         std::wstring name; 
         if(al.IsNull())
-           break;
-        name=convert(al.GetAttribute("Name").GetValue());
-        var_template(name,0.0);
+           break;	// exhaustively iterate through the "Allele" sub-elements of Alleles
+        name=convert(al.GetAttribute("Name").GetValue());	// get the String value for Name attribute in "al" allele sub-element; convert it to wstring and store in name
+        // Initialise variable template
+		var_template(name,0.0);
     }
 }
 
@@ -168,15 +177,18 @@ int main(int argc,char *argv[])
 {
     char *pBuffer=NULL;
     long nSize=0;
-    GAEngine<COMP_FUNC > ga;
+    GAEngine<COMP_FUNC > ga;	// initialise a GA engine
     int proc,nproc;
     int generations=1;
     const char *filename=NULL;
 
-    srand(time(NULL));
+    srand(time(NULL));	// seed the RNG
+
     MPI_Init(&argc,&argv);
+
     if(argc<2)
     {
+		// incorrect implementation of program
         usage(argv[0]);
         return -1;
     }
@@ -184,8 +196,10 @@ int main(int argc,char *argv[])
     for(int i=1;i<argc;i++)
     {
         if(!strcmp(argv[i],"-v"))
+			// if an arg string is "-v" increment verbosity
             verbosity++;
         else
+			// other arg string becomes the filename
             filename=argv[i];
     }
 
@@ -196,11 +210,13 @@ int main(int argc,char *argv[])
     bootstrap=CreateCellMLBootstrap();
     cis=CreateIntegrationService();
 
-    if((pBuffer=OpenXmlFile(filename,nSize))==NULL)
+	// Read input file and store contents in buffer
+    if((pBuffer=OpenXmlFile(filename,nSize)) == NULL)
     {
-         fprintf(stderr,"Error opening input file %s\n",argv[1]);
-         return -1;
+		fprintf(stderr,"Error opening input file %s\n",argv[1]);
+		return -1;
     }
+	// pBuffer is a C-string containing file and nSize is assigned the size of file
 
     //Load the experiments package
     try
@@ -220,12 +236,15 @@ int main(int argc,char *argv[])
                break;
             VEGroup::instance().add(vx);
         }
+
         if(!proc)
         {
+			// assign number of generations to run GA and initialise the GA engine
             generations=SetAndInitEngine(ga,root("GA",0));
         }
         else
         {
+			// initialise the template variable holder
             initialize_template_var(root("GA",0));
         }
     }
@@ -233,7 +252,8 @@ int main(int argc,char *argv[])
     {
         printf("Parsing error at line %d\n",e.GetLine());
     }
-    delete [] pBuffer;
+    delete [] pBuffer;	// free memory used to store file
+
     //Wait until all the clints are ready
     //
     MPI_Barrier(MPI_COMM_WORLD);
@@ -244,12 +264,15 @@ int main(int argc,char *argv[])
         //Master task
         VariablesHolder v;
 
-
+		//Initialise the GA population
         ga.Initialise();
-        ga.RunGenerations(generations); //Run generations
-        double bf=ga.GetBest(v);
-        printf("Best fitness: %lf\n",bf);
-        //Print out results for best fitness
+		//Run GA
+        ga.RunGenerations(generations);
+        
+		double bf=ga.GetBest(v);	// v stores the best Genome's chromosome from the run; bf stores its fitness
+        
+		//Print out results for best fitness
+		printf("Best fitness: %lf\n",bf);
         for(int i=0;;i++)
         {
             wstring name=v.name(i);
@@ -263,9 +286,11 @@ int main(int argc,char *argv[])
     {
         run_slave(proc);
     }
+
     MPI_Barrier(MPI_COMM_WORLD);
 
     MPI_Finalize();
+
     return 0;
 }
 
