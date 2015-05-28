@@ -152,11 +152,15 @@ class Genome
         }
 
 		// var
-		// 'update' all alleles of this genome to v
+		// store the alleles data of a genome in a variables holder
+			// 'update' all alleles of this genome to v
+			// if this genome is missing some alleles, v may contain some alleles unknown to genome
         void var(VariablesHolder& v)
         {
+			// iterate through the alleles in this genome
             for(ALLELE::iterator it=m_Alleles.begin();it!=m_Alleles.end();++it)
             {
+				// update each allele in v
                 v(it->first,it->second);
             }
         }
@@ -230,27 +234,30 @@ class GAEngine
         }
 
 
-		// Initialise
+		// Initialise the population with randomly generated genomes
         bool Initialise()
         {
-			// Initialises the m_Population for GA
+			// Create a representative genome for the population
             Genome v;
-
-            
-            if(!m_Population.size() || !m_AlleleList.size())	// !(int)b is equivalent to (b == 0)
+			
+			// exit exceptions
+            if(!m_Population.size() || !m_AlleleList.size())
                 return false;
 
-			// m_Population and m_AlleleList are non-empty
-			for(typename std::vector<std::wstring>::iterator it=m_AlleleList.begin();it!=m_AlleleList.end();++it)	// typename trick to initialise an iterator variable it
+			// Attach alleles to the representative genome
+			for(typename std::vector<std::wstring>::iterator it=m_AlleleList.begin();it!=m_AlleleList.end();++it)	// iterate through the list of allele names
 			{
-				// append each pair<wstring,0> to allele of v (storage of m_AlleleList in v)
+				// Create each allele with all values initialised to 0.0
 				v.allele(*it,(double)0.0);
 			}
+
+			// Fill the population with each mutation of the genome
             for(int i=0;i<m_Population.size();i++)
             {
-                mutate(std::wstring(),v,true);	// mutate-all
-                m_Population[i]=v;				// fill m_Population with randomly mutated Genomes
+                mutate(std::wstring(),v,true);	// mutate all the alleles of v
+                m_Population[i]=v;				// a randomly generated genome enters the population
             }
+
             return true;
         }
 
@@ -283,7 +290,7 @@ class GAEngine
         }
 
 		// var_to_workitem
-		// returns a pointer to a new WorkItem that has collated h's m_Vars second values
+		// returns a pointer to a newly initiated WorkItem that has collated h's allele values
         WorkItem *var_to_workitem(VariablesHolder& h)
         {
             WorkItem *w=new WorkItem;
@@ -305,6 +312,11 @@ class GAEngine
         }
 
 		// RunGenerations
+		/**
+		 *	run the GA engine for given number of generations
+		 *
+		 *
+		 **/
         void RunGenerations(int gener)
         {
             VariablesHolder v;
@@ -314,16 +326,21 @@ class GAEngine
             //Create initial fitness set
 			for(int i=0;i<m_Population.size();i++)
 			{
-				Genome& g=m_Population[i];
+				Genome& g=m_Population[i];	// get the ith Genome in population
 
-				g.var(v);		// 'update' all alleles of g into v
-				WorkItem *w=var_to_workitem(v);
-				w->key=i;
-				Distributor::instance().push(w);				//??
+				// 'update' all alleles of this genome into temporary variable storage
+				g.var(v);	// strange behaviour when this genome is incomplete
+				WorkItem *w=var_to_workitem(v);		// initiate a ptr workitem that has collated this genome's allele values
+				w->key=i;	// assign this workitem's key accordingly
+				Distributor::instance().push(w);	// push this work into the singleton distributor
 			}
-			Distributor::instance().process(observer,this);		//??
+
+			// Process the works
+			Distributor::instance().process(observer,this);		//?? this must be assigning the fitness of each genome in population: HINT this meaning the GAEngine obj
+
 			std::sort(m_Population.begin(),m_Population.end(),reverse_compare);		// sort m_Population (vector<Genome>) by reverse_compare: in ascending order of fitness
-            // check if best ftns is assigned. if not, assign it	(fitness minimisation!)
+            
+			// check if best ftns is assigned. if not, assign it	(fitness minimisation!)
 			if(!m_bBestFitnessAssigned || m_bestFitness>m_Population[0].fitness())
             {
                 m_bestFitness=m_Population[0].fitness();	// assign min ftns as the best fitness
@@ -510,8 +527,8 @@ class GAEngine
 				 */
 
 
-				// if name is non-emtpy wstring, only the allele with matching name may be mutated
-					//if name is empty wstring mutate all alleles
+				// if		name is non-emtpy wstring, only the allele with matching name may be mutated
+				// else if	name is an empty wstring, mutate all alleles
                 if(!name.size() || g.name(i)==name)		
                 {
                     LIMITS::iterator it=m_Limits.find(g.name(i));	// check for param limits of this allele
