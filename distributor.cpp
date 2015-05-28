@@ -97,8 +97,8 @@ void Distributor::process(Distributor::OBSERVER o,void *p)
             //we are the only one available - do compute
             double answer;
 
-            answer=do_compute(workitem->data); //compute
-            o(workitem,answer,p); //call observer                 
+            answer=do_compute(workitem->data); // compute this workitem's data, returns the residual
+            o(workitem,answer,p); //call observer
             //get data back
             if(in_process)
             {
