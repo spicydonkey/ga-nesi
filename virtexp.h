@@ -199,8 +199,12 @@ class VEGroup
         ~VEGroup();
 
     public:
+		// get the singleton VE group object
         static VEGroup& instance();
+
         double Evaluate(VariablesHolder& v);
+
+		//
         void add(VirtualExperiment *p);
 
     protected:
