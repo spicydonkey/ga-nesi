@@ -121,6 +121,8 @@ void VirtualExperiment::SetParameters(VariablesHolder& v)
     }
 }
 
+
+// TODO
 void VirtualExperiment::SetVariables(VariablesHolder& v)
 {
     ObjRef<iface::cellml_api::CellMLComponentSet> comps=m_Model->modelComponents();
@@ -262,23 +264,41 @@ VEGroup& VEGroup::instance()
 }
 
 
+
+/**
+ *	Evaluate a model's fit against data from a group of virtual experiments
+ *	
+ *	VariableHolder argument contains a list of parameters for the model for which the average deviation 
+ *		from experimental data will be returned
+ *	
+ *	INFINITY is an exception returned when particularly poor fit against experiment
+ *	0.0 returned when the VEGroup object contains no virtual experiments
+ **/
 double VEGroup::Evaluate(VariablesHolder& v)
 {
     double res=0.0;
-    int count=0;
+    int count=0;	// counter for the number of experiments that yielded a finite residual
 
     if(!experiments.size())
-        return 0.0;
+        return 0.0;	// no virtual experiments to reference
+
     for(int i=0;i<experiments.size();i++)
     {
+		// set variables to compare against experiment
         experiments[i]->SetVariables(v);
-        double d=experiments[i]->Evaluate();
+
+		// evaluate residual from this experiment 
+        double d=experiments[i]->Evaluate();	//??? residual method	TODO
+
+		// update the total residual
         if(d!=INFINITY)
         {
             res+=d;
             count++;
         }
     }
+
+	// return this param list's average deviation evaluated from all virtual experiments
     return (count==experiments.size()?res/(double)count:INFINITY);
 }
 
