@@ -188,7 +188,7 @@ int main(int argc,char *argv[])
 
     if(argc<2)
     {
-		// incorrect implementation of program
+		// warn user for incorrect usage of command
         usage(argv[0]);
         return -1;
     }
@@ -216,30 +216,42 @@ int main(int argc,char *argv[])
 		fprintf(stderr,"Error opening input file %s\n",argv[1]);
 		return -1;
     }
-	// pBuffer is a C-string containing file and nSize is assigned the size of file
+	// Read success: pBuffer is a C-string containing file and nSize is size of file
 
-    //Load the experiments package
+    //Load the experiments package: GA parameters and Virtual Experiment data
     try
     {
         Parser parser;
-        ObjRef<CellMLComponentSet> comps;
+        ObjRef<CellMLComponentSet> comps;	//??? comps not referenced elsewhere in project
 
-
-        auto_ptr<Document> pDoc(parser.Parse(pBuffer,nSize));
+		// Parse the XML contents in buffer
+        auto_ptr<Document> pDoc(parser.Parse(pBuffer,nSize));	// can throw an exception
+		// Get the root of the XML structure
         const Element& root=pDoc->GetRoot();
-        for(int i=0;;i++)
-        {
-            VariablesHolder params;
 
+		
+		// load all virtual experiments in the XML file
+        //
+		for(int i=0;;i++)
+        {
+            VariablesHolder params;	//??? unused
+
+			// load the ith VE in file
             VirtualExperiment *vx=VirtualExperiment::LoadExperiment(root("VirtualExperiments",0)("VirtualExperiment",i));
-            if(!vx)
+			// check if this VE is defined
+			if(!vx)
                break;
+			
+			// add each VE into the group singleton
             VEGroup::instance().add(vx);
         }
 
+		
+		// load the GA parameters from file and initialise the engine
+		//
         if(!proc)
         {
-			// assign number of generations to run GA and initialise the GA engine
+			// assign number of generations and initialise the parameters for the GA engine
             generations=SetAndInitEngine(ga,root("GA",0));
         }
         else
@@ -254,7 +266,7 @@ int main(int argc,char *argv[])
     }
     delete [] pBuffer;	// free memory used to store file
 
-    //Wait until all the clints are ready
+	//Wait until all the clints are ready
     //
     MPI_Barrier(MPI_COMM_WORLD);
 
