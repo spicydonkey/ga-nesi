@@ -31,6 +31,8 @@ VirtualExperiment *VirtualExperiment::LoadExperiment(const AdvXMLParser::Element
     VirtualExperiment *vx=NULL;
 
     string strName=elem.GetAttribute("ModelFilePath").GetValue();
+	
+	// Check if the model file path is defined
     if(!strName.size())
         return NULL;
     vx=new VirtualExperiment;
