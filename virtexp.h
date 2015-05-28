@@ -52,10 +52,10 @@ class VariablesHolder
 			return (it==m_Vars.end()?double(0.0):it->second);
 		}
 
-		//Update an allele (pair) in VarHold's m_Var obj and return updated allele value
+		//Update an allele (pair<str name, doub value>) in VarHold's m_Var obj and return updated allele value
 		double operator()(const std::wstring& name,double val)
 		{
-			//find the iterator for name
+			//find if matching allele already exists in VarHold
 			ALLELE::iterator it=find_if(m_Vars.begin(),m_Vars.end(),
 			   bind1st(pair_equal_to<std::wstring,double>(),name));
 
@@ -202,14 +202,17 @@ class VEGroup
 		// get the singleton VE group object
         static VEGroup& instance();
 
+		// TODO
         double Evaluate(VariablesHolder& v);
 
-		//
+		// TODO
         void add(VirtualExperiment *p);
 
     protected:
         typedef std::vector<VirtualExperiment *> VE;
-        VE experiments;
+        
+		// a vector of pointers to virtual experiments
+		VE experiments;
 };
 
 #endif
