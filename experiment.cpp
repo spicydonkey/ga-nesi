@@ -140,10 +140,12 @@ bool observer(WorkItem *w,double answer,void *g)
 }
 
 
-
+// perform Evaluate from given vector of doubles
 double do_compute(std::vector<double>& val)
 {
+	// fill-up the tmp's allele values with supplied data
     var_template.fillup(val);
+	// evaluate this chromosome's fit and return the representative residual
     return VEGroup::instance().Evaluate(var_template);
 }
 
@@ -276,7 +278,7 @@ int main(int argc,char *argv[])
         //Master task
         VariablesHolder v;
 
-		//Initialise the GA population
+		//Initialise the population in GA engine
         ga.Initialise();
 		//Run GA
         ga.RunGenerations(generations);
