@@ -1,0 +1,6 @@
+#!/bin/bash
+
+FILENAME='shifted.xml'
+
+../experiment ${FILENAME} -v -v  > ${FILENAME%.*}.out;
+
