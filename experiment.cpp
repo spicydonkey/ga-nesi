@@ -1,30 +1,51 @@
+// define SEQMODE to build a sequential mode to test code (Schwefel function); no call to CellML
+#define SEQMODE
+
+// On single-core don't use UNICODE
+#ifdef SEQMODE
+#include <string.h>
+#include <cfloat>
+//#undef UNICODE
+//#undef _UNICODE
+#endif
+
+#ifndef SEQMODE
 #include <mpi.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include "AdvXMLParser.h"
-#include "GAEngine.h"
 #include "cellml-api-cxx-support.hpp"
 #include "IfaceCellML_APISPEC.hxx"
 #include "IfaceCIS.hxx"
 #include "CellMLBootstrap.hpp"
 #include "CISBootstrap.hpp"
-#include "virtexp.h"
 #include "distributor.h"
+#endif
+#ifdef SEQMODE
+#include "processor.h"
+#endif
+//#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "AdvXMLParser.h"
+#include "GAEngine.h"
+#include "virtexp.h"
 
 
 using namespace std;
 using namespace AdvXMLParser;
+
+#ifndef SEQMODE
 using namespace iface::cellml_api;
 using namespace iface::cellml_services;
+#endif
 
 //If SUPPORT_BLOCK_SAMPLING is defined
 //the selection algorithms may use either
 //probabilistic search or blocking search
 //#define SUPPORT_BLOCK_SAMPLING
 
+#ifndef SEQMODE
 ObjRef<iface::cellml_api::CellMLBootstrap> bootstrap; //CellML api bootstrap
 ObjRef<iface::cellml_services::CellMLIntegrationService> cis;
+#endif
 
 VariablesHolder var_template; //template for the variables, just holds names of the variables
 
@@ -68,7 +89,7 @@ char *OpenXmlFile(const char *name,long& nSize)
 
 //Initialise GA engine
 	//return number of generations to run GA
-int SetAndInitEngine(GAEngine<COMP_FUNC >& ga,const AdvXMLParser::Element& elem)
+int SetAndInitEngine(GAEngine<COMP_FUNC >& ga, const Element& elem)		//AdvXMLParser
 {
 	//Get GA parameters from XML file
     int initPopulation=atoi(elem.GetAttribute("InitialPopulation").GetValue().c_str());
@@ -96,7 +117,7 @@ int SetAndInitEngine(GAEngine<COMP_FUNC >& ga,const AdvXMLParser::Element& elem)
     //Read alleles information
     for(int i=0;;i++)
     {
-        const AdvXMLParser::Element& al=elem("Alleles",0)("Allele",i);		// assign to "al" the ith Allele sub-element of the (first) Alleles element in "elem"
+        const Element& al=elem("Alleles",0)("Allele",i);		//AdvXMLParser// assign to "al" the ith Allele sub-element of the (first) Alleles element in "elem"
         std::wstring name;
         if(al.IsNull())
            break;	// exhaustively iterate through the "Allele" sub-elements of Alleles
@@ -115,32 +136,37 @@ int SetAndInitEngine(GAEngine<COMP_FUNC >& ga,const AdvXMLParser::Element& elem)
 }
 
 
-//Initialise the template variable holder with Alleles sub-element
-void initialize_template_var(const AdvXMLParser::Element& elem)
+//Initialise var_template with Alleles in XML; all param names are updated into var_template
+void initialize_template_var(const Element& elem)	//AdvXMLParser
 {
     for(int i=0;;i++)
     {
-        const AdvXMLParser::Element& al=elem("Alleles",0)("Allele",i);	// assign to "al" the ith Allele sub-element of the (first) Alleles element in "elem"
+        const Element& al=elem("Alleles",0)("Allele",i);	// assign to "al" the ith Allele sub-element of the (first) Alleles element in "elem"
         std::wstring name; 
         if(al.IsNull())
            break;	// exhaustively iterate through the "Allele" sub-elements of Alleles
         name=convert(al.GetAttribute("Name").GetValue());	// get the String value for Name attribute in "al" allele sub-element; convert it to wstring and store in name
-        // Initialise variable template
+        // Add this parameter as an allele in var_template
 		var_template(name,0.0);
     }
 }
 
+
 //Observer callback
 bool observer(WorkItem *w,double answer,void *g)
 {
-    GAEngine<COMP_FUNC> *ga=(GAEngine<COMP_FUNC> *)g;
+    GAEngine<COMP_FUNC> *ga=(GAEngine<COMP_FUNC> *)g;	// type casting void pointer appropriately
    
     ga->process_workitem(w,answer);
     return true;
 }
 
-
-// perform Evaluate from given vector of doubles
+#ifndef SEQMODE
+// do_compute [distributor.cpp]
+/**
+ *	
+ *
+ **/
 double do_compute(std::vector<double>& val)
 {
 	// fill-up the tmp's allele values with supplied data
@@ -148,6 +174,7 @@ double do_compute(std::vector<double>& val)
 	// evaluate this chromosome's fit and return the representative residual
     return VEGroup::instance().Evaluate(var_template);
 }
+
 
 //Slave process
 //Returns only when quit command is received from the master
@@ -174,20 +201,39 @@ void run_slave(int proc)
         MPI_Send(&req,1,MPI_DOUBLE,0,0,MPI_COMM_WORLD);
     }
 }
+#else
+// do_compute	[processor.cpp]
+/**
+ *	Evaluate the multi-dim Schwefel function at location from given parameters
+ *
+ **/
+double do_compute(std::vector<double>& val)
+{
+	// fill-up the tmp's allele values with supplied data
+	var_template.fillup(val);
+	// *VIRTUAL* evaluate this chromosome's fit and return the representative residual
+		// in fact it calls the schwefel function at location "val"
+	return VEGroup::instance().Evaluate(var_template);
+}
+#endif
+
 
 int main(int argc,char *argv[])
 {
     char *pBuffer=NULL;
     long nSize=0;
     GAEngine<COMP_FUNC > ga;	// initialise a GA engine
-    int proc,nproc;
+#ifndef SEQMODE
+	int proc,nproc;
+#endif
     int generations=1;
     const char *filename=NULL;
 
     srand(time(NULL));	// seed the RNG
 
+#ifndef SEQMODE
     MPI_Init(&argc,&argv);
-
+#endif
     if(argc<2)
     {
 		// warn user for incorrect usage of command
@@ -205,12 +251,14 @@ int main(int argc,char *argv[])
             filename=argv[i];
     }
 
+#ifndef SEQMODE
     MPI_Comm_rank(MPI_COMM_WORLD, &proc);
     MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
     //Load and initialise CellML API
     bootstrap=CreateCellMLBootstrap();
     cis=CreateIntegrationService();
+#endif
 
 	// Read input file and store contents in buffer
     if((pBuffer=OpenXmlFile(filename,nSize)) == NULL)
@@ -224,33 +272,34 @@ int main(int argc,char *argv[])
     try
     {
         Parser parser;
+
+#ifndef SEQMODE
         ObjRef<CellMLComponentSet> comps;	//??? comps not referenced elsewhere in project
+#endif
 
 		// Parse the XML contents in buffer
         auto_ptr<Document> pDoc(parser.Parse(pBuffer,nSize));	// can throw an exception
 		// Get the root of the XML structure
         const Element& root=pDoc->GetRoot();
 
-		
+#ifndef SEQMODE
 		// load all virtual experiments in the XML file
-        //
 		for(int i=0;;i++)
         {
             VariablesHolder params;	//??? unused
 
 			// load the ith VE in file
             VirtualExperiment *vx=VirtualExperiment::LoadExperiment(root("VirtualExperiments",0)("VirtualExperiment",i));
-			// check if this VE is defined
 			if(!vx)
-               break;
+               break;	// load all the VE in file
 			
 			// add each VE into the group singleton
             VEGroup::instance().add(vx);
         }
-
+#endif
 		
 		// load the GA parameters from file and initialise the engine
-		//
+#ifndef SEQMODE
         if(!proc)
         {
 			// assign number of generations and initialise the parameters for the GA engine
@@ -261,6 +310,12 @@ int main(int argc,char *argv[])
 			// initialise the template variable holder
             initialize_template_var(root("GA",0));
         }
+#endif
+#ifdef SEQMODE
+		generations=SetAndInitEngine(ga,root("GA",0));		// load the GA params and initialise the engine
+		initialize_template_var(root("GA",0));		// initialise var_template with alleles 
+#endif
+
     }
     catch(ParsingException e)
     {
@@ -268,6 +323,7 @@ int main(int argc,char *argv[])
     }
     delete [] pBuffer;	// free memory used to store file
 
+#ifndef SEQMODE
 	//Wait until all the clints are ready
     //
     MPI_Barrier(MPI_COMM_WORLD);
@@ -276,14 +332,15 @@ int main(int argc,char *argv[])
     if(!proc)
     {
         //Master task
-        VariablesHolder v;
+#endif
+        VariablesHolder v;	// storage for the best chromosome
 
 		//Initialise the population in GA engine
         ga.Initialise();
 		//Run GA
         ga.RunGenerations(generations);
         
-		double bf=ga.GetBest(v);	// v stores the best Genome's chromosome from the run; bf stores its fitness
+		double bf=ga.GetBest(v);	// store the best Genome's chromosome from the run; bf stores its fitness
         
 		//Print out results for best fitness
 		printf("Best fitness: %lf\n",bf);
@@ -294,6 +351,7 @@ int main(int argc,char *argv[])
                 break;
             printf("Best[%s]=%lf\n",convert(name).c_str(),v(name));
         }
+#ifndef SEQMODE
         Distributor::instance().finish();
     }
     else
@@ -304,7 +362,13 @@ int main(int argc,char *argv[])
     MPI_Barrier(MPI_COMM_WORLD);
 
     MPI_Finalize();
+#endif
 
     return 0;
 }
 
+
+//#ifdef SEQMODE
+//#define UNICODE 1
+//#define _UNICODE 1
+//#endif
