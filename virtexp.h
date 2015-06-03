@@ -1,11 +1,13 @@
 #ifndef VIRTUAL_EXPERIMENT_H
 #define VIRTUAL_EXPERIMENT_H
 #include <stddef.h>
+#ifndef SEQMODE
 #include "cellml-api-cxx-support.hpp"
 #include "IfaceCellML_APISPEC.hxx"
 #include "CellMLBootstrap.hpp"
-#include "AdvXMLParser.h"
 #include "CISBootstrap.hpp"
+#endif
+#include "AdvXMLParser.h"
 #include "utils.h"
 #include <string>
 #include <functional>
@@ -58,7 +60,7 @@ class VariablesHolder
 			//find if matching allele already exists in VarHold
 			ALLELE::iterator it=find_if(m_Vars.begin(),m_Vars.end(),
 			   bind1st(pair_equal_to<std::wstring,double>(),name));
-
+			
 			if(it!=m_Vars.end())
 			   it->second=val;	//update the allele if it already exists
 			else
@@ -71,7 +73,7 @@ class VariablesHolder
 		std::wstring name(int index)
 		{
 			//return the name of allele at the index location of allele vector m_Vars (nullwstr if index out of range)
-			return ((index>=0 && index<m_Vars.size())?m_Vars[index].first:std::wstring());
+			return (index>=0 && index<m_Vars.size())?m_Vars[index].first:std::wstring();
 		}
 
 		bool exists(const std::wstring& name)
@@ -138,6 +140,8 @@ class VirtualExperiment
     public:
         VirtualExperiment();
         ~VirtualExperiment();
+
+#ifndef SEQMODE
         bool LoadModel(const std::string& model_name);
         static VirtualExperiment *LoadExperiment(const AdvXMLParser::Element& elem);
         void SetVariables(VariablesHolder& v);
@@ -175,7 +179,10 @@ class VirtualExperiment
 
         double getSSRD(std::vector<std::pair<int,double> >& d);
         std::string m_strModelName;
+
+
         ObjRef<iface::cellml_api::Model> m_Model;
+#endif		
 		int m_nResultColumn;
         
 		// Type definitions
@@ -206,7 +213,7 @@ class VEGroup
         double Evaluate(VariablesHolder& v);
 
 		// TODO
-        void add(VirtualExperiment *p);
+		void add(VirtualExperiment *p);
 
     protected:
         typedef std::vector<VirtualExperiment *> VE;
