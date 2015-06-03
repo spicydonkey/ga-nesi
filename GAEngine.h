@@ -8,15 +8,22 @@
 #include <functional>
 #include <time.h>
 #include <stdlib.h>
+#ifndef SEQMODE
 #ifdef SUPPORT_MPI
 #include <mpi.h>
+#endif
 #endif
 #include <limits>
 #include "utils.h"
 #include "virtexp.h"
+#ifndef SEQMODE
 #include "distributor.h"
+#endif
 #include <math.h>
-
+#ifdef SEQMODE
+#include "processor.h"
+//#define INFINITY MAX_DOUBLE // redefined
+#endif
 
 extern int verbosity;
 
@@ -53,17 +60,19 @@ class Genome
             return *this;
         }
 
-		// allele
+		// Find allele's value given name (0.0 if not found)
         double allele(const std::wstring& name)
         {
             ALLELE::iterator it=find_if(m_Alleles.begin(),m_Alleles.end(),
                    bind1st(pair_equal_to<std::wstring,double>(),name));		// pair_equal_to argument std::wstring& ?
             return (it==m_Alleles.end()?double(0.0):it->second);			// returns 0.0 if name not found and m_Alleles' second value if found 
         }
+		// Index the ith allele in genome
         double allele(int index)
         {
             return ((index>=0 && index<m_Alleles.size())?m_Alleles[index].second:0.0);	// second val of ith pair of m_Alleles; if index out of range, 0.0
         }
+		// Add/update an allele and corresponding value
         void allele(const std::wstring& name,double val)		// if m_Alleles has an element with first==name, assign the second to val; push_back <name,val> into m_Allele
         {
             ALLELE::iterator it=find_if(m_Alleles.begin(),m_Alleles.end(),
@@ -73,7 +82,8 @@ class Genome
             else
                m_Alleles.push_back(std::make_pair<std::wstring,double>(std::wstring(name),double(val)));
         }
-        void allele(int index,double val)		// assigns the second memb of the i(ndex)th elem of m_Alleles to val, if in range
+		// Update the ith allele's value
+        void allele(int index,double val)		
         {
             if(index>=0 && index<m_Alleles.size())
                m_Alleles[index].second=val;
@@ -86,7 +96,7 @@ class Genome
 		// name
         std::wstring name(int index)
         {
-			// rts first memb of ith elem of m_Alleles; if index out of range, an empty string
+			// rts ith allele's name; if index out of range, an empty string
             return ((index>=0 && index<m_Alleles.size())?m_Alleles[index].first:std::wstring());
         }
 
@@ -97,7 +107,7 @@ class Genome
             return m_Alleles.size();
         }
 
-		// [] operator (indexing)
+		// [] operator (indexing) a Genome
         std::pair<std::wstring,double>& operator[](int index)
         {	
 			// pushback <emptystr, 0.0> to m_Alleles until vector index is in range, then return that elem of m_Alleles
@@ -187,6 +197,7 @@ class Genome
 bool reverse_compare(const Genome& v1,const Genome& v2) { return (v1<v2); }
 extern bool observer(WorkItem *w,double answer,void *);
 
+
 template<typename COMP>
 class GAEngine
 {
@@ -261,19 +272,23 @@ class GAEngine
             return true;
         }
 
+		// Size of a GAEngine
+        int size() { return m_Population.size(); }	// population size
 
-        int size() { return m_Population.size(); }
+		// Add an allele (name) to engine's storage
         void AddAllele(const std::wstring& name)
         {
             m_AlleleList.push_back(name);
         }
+
+		// Add limits to the range of allele's valid values
         void AddLimit(const std::wstring& name,double lower,double upper)
         {
             m_Limits[name]=std::make_pair(double(lower),double(upper));
         }
 		
 		// var_template
-		// store in a VarHolder the template allele name list
+		// store in a VarHolder argument the template allele name list
         void var_template(VariablesHolder& v)
         {
             for(std::vector<std::wstring>::iterator it=m_AlleleList.begin();it!=m_AlleleList.end();++it)
@@ -282,15 +297,15 @@ class GAEngine
             }
         }
 
-		// GetBest
+		// Store in the VarHolder argument the currently fittest chromosome and return its fitness
         double GetBest(VariablesHolder& v)
         {
             v=m_bestVariables;
             return m_bestFitness;
         }
 
-		// var_to_workitem
-		// returns a pointer to a newly initiated WorkItem that has collated h's allele values
+		// Create a new WorkItem with chromosome data from a VarHolder collated
+			// key initialised to 0
         WorkItem *var_to_workitem(VariablesHolder& h)
         {
             WorkItem *w=new WorkItem;
@@ -299,22 +314,19 @@ class GAEngine
             return w;
         }
 
-		// process_workitem
-		// assigns the key-th Genome of m_Pop's m_fitness to answer, and deletes the WorkItem
+		// Assign the workitem.key-th Genome's fitness, and deletes the WorkItem
         void process_workitem(WorkItem *w,double answer)
         {
             if(w->key<m_Population.size())
             {
-                Genome& g=m_Population[w->key];
-                g.fitness(answer);
+                Genome& g=m_Population[w->key];	// reference to the appropriate genome
+                g.fitness(answer);	// assign fitness
             }
             delete w;
         }
 
-		// RunGenerations
 		/**
-		 *	run the GA engine for given number of generations
-		 *
+		 *	Run the GA engine for given number of generations
 		 *
 		 **/
         void RunGenerations(int gener)
@@ -330,13 +342,23 @@ class GAEngine
 
 				// 'update' all alleles of this genome into temporary variable storage
 				g.var(v);	// strange behaviour when this genome is incomplete
-				WorkItem *w=var_to_workitem(v);		// initiate a ptr workitem that has collated this genome's allele values
+				WorkItem *w=var_to_workitem(v);		// initiate a ptr workitem that has collated this genome's chromosome
 				w->key=i;	// assign this workitem's key accordingly
+				
+#ifndef SEQMODE
 				Distributor::instance().push(w);	// push this work into the singleton distributor
+#else
+				Processor::instance().push(w);		// push this work into the singleton process scheduler
+#endif
 			}
 
 			// Process the works
-			Distributor::instance().process(observer,this);		//?? this must be assigning the fitness of each genome in population: HINT this meaning the GAEngine obj
+				// evaluate and assign the fitness function for each Genome
+#ifndef SEQMODE
+			Distributor::instance().process(observer,this);		//?? TODO: this must be assigning the fitness of each genome in population: HINT this meaning the GAEngine obj
+#else
+			Processor::instance().process(observer,this);		// process the workitems scheduled in the Processor singleton and update this GA state from the observer call
+#endif
 
 			std::sort(m_Population.begin(),m_Population.end(),reverse_compare);		// sort m_Population (vector<Genome>) by reverse_compare: in ascending order of fitness
             
@@ -350,7 +372,7 @@ class GAEngine
 
             print_stage(-1);		// -1 for initial generation
 
-            for(int g=0;g<gener;g++)
+			for(int g=0;g<gener;g++)
             {
 				//Do the genetics
 				int limit=m_Population.size();
@@ -361,22 +383,24 @@ class GAEngine
                 double l=(double)prev.size()-0.5;
 
 				// SELECTION
-				// select Genomes from prev gen to carry on; store in m_Population vector
+				// fill m_Population vector with weighted selection with replacement from prev generation's population
                 for(int i=0;i<limit;i++)
                 {
-                    int mem=select_weighted(prev);		// mem is the randomly selected Genome's index (p.size()-1 when err)
+                    int mem=select_weighted(prev);		// mem is the random weight-selected Genome's index (p.size()-1 when err)
                     //printf("Adding %d to population\n",mem);
                     m_Population.push_back(prev[mem]);	// append the selected Genome into curr Pop vector
                 }
 
 
-                //Do the crossovers
+                // CROSSOVER
+				// BUG! Multiple crossovers can happen in one generation!
                 if(m_crossPartition)
                 {
-                    std::vector<int> sample;	// initialise an integer vector
+					// vector that stores indices of Genomes in population for genetic operations
+                    std::vector<int> sample;
 
                     if(!m_UseBlockSample)
-                        build_rnd_sample_rnd(sample,m_CrossProbability*100.0,true);		// fill sample with indices to perform crossover
+                        build_rnd_sample_rnd(sample,m_CrossProbability*100.0,true);		// fill sample with indices to perform crossover. samplesize <= popsize
                     else
                         build_rnd_sample(sample,m_crossPartition,true,true);			// disallow duplicates in building sample (size m_crossPartition)
 
@@ -386,31 +410,42 @@ class GAEngine
                         
                         arena.push_back(sample[i]);	//ith sample enters arena 
 						//bulid tournament sample
-                        build_rnd_sample(arena,1,true,true); //another sample enters arena, avoid self for crossbreeding
+                        build_rnd_sample(arena,1,true,true); //another sample enters arena from population, avoiding self for crossbreeding
 
 						//cross the Genomes in arena at a randomly selected crosspoint
+						// BUG TODO: prone to multiple degree crossover in a single generation iteration
 	    				cross(m_Population[arena[0]],m_Population[arena[1]],
 							(int)rnd_generate(1.0,m_Population[sample[i]].size()));		//crosspoint in [1,allele length of ith sample genome]
 
                         for(int j=0;j<2;j++)
                         {
-							m_Population[arena[j]].var(v);
-                            Distributor::instance().remove_key(arena[j]); //remove previously requested processing
+							m_Population[arena[j]].var(v);	// store the Xover operated genome in template
+#ifndef SEQMODE
+                            Distributor::instance().remove_key(arena[j]);	//remove previously requested processing
+#else
+							Processor::instance().remove_key(arena[j]);		// remove previously requested processing
+#endif
+							// Set-up workitem for Xover'd genome job
 							WorkItem *w=var_to_workitem(v);
 							w->key=arena[j];
+#ifndef SEQMODE
 							Distributor::instance().push(w);
+#else
+							Processor::instance().push(w);
+#endif
                         }
+						// genomes weight-selected into population that did not undergo Xover do not need to be re-worked for fitness 
                     }
-                }
+				}
 
 
-                //Do the mutations
+                // MUTATION
                 if(m_mutatePartition)
                 {
                     std::vector<int> sample;
 
                     if(!m_UseBlockSample)
-                        build_rnd_sample_rnd(sample,m_MutationProbability*100.0,false);	//sample vector includes even invalid Genomes
+                        build_rnd_sample_rnd(sample,m_MutationProbability*100.0,false);	// invalid Genomes may be picked into sample
                     else
                         build_rnd_sample(sample,m_mutatePartition,false,false); //allow duplicates and invalid genomes to build sample (size m_mutatePartition)
 
@@ -422,21 +457,33 @@ class GAEngine
 							sample.push_back(i);
                     }
 
-					//Mutate invalid population members
+					// Mutate the genomes selection in sample
                     for(int i=0;i<sample.size();i++)
                     {
-	    				mutate(std::wstring(),m_Population[sample[i]],!(m_Population[sample[i]].valid()));	// mutate-all iff genome is invalid. else mutate approx 1 allele
+	    				mutate(std::wstring(),m_Population[sample[i]],!(m_Population[sample[i]].valid()));	// mutate the whole chromosome iff genome is invalid. else mutate approx 1 allele
 						m_Population[sample[i]].var(v);
+#ifndef SEQMODE
                         Distributor::instance().remove_key(sample[i]); //remove previously requested processing
+#else
+						Processor::instance().remove_key(sample[i]);
+#endif
 						WorkItem *w=var_to_workitem(v);
-                        m_Population[sample[i]].set(v);		//??
+                        m_Population[sample[i]].set(v);		// TODO??
 						w->key=sample[i];
+#ifndef SEQMODE
 						Distributor::instance().push(w);
+#else
+						Processor::instance().push(w);
+#endif
                     }
                 }
 
 				//Run the distribution
+#ifndef SEQMODE
 				Distributor::instance().process(observer,this);
+#else
+				Processor::instance().process(observer,this);
+#endif
 				std::sort(m_Population.begin(),m_Population.end(),reverse_compare);
 
                 if(m_Population.size()>m_MaxPopulation)
@@ -453,7 +500,7 @@ class GAEngine
                     m_bBestFitnessAssigned=true;
                 }
                 print_stage(g);
-            }
+			}
         }
 
     private:
@@ -527,7 +574,7 @@ class GAEngine
 				 */
 
 
-				// if		name is non-emtpy wstring, only the allele with matching name may be mutated
+				// if		name is non-emtpy wstring, only the allele with matching name is mutated at the mutation rate
 				// else if	name is an empty wstring, mutate all alleles
                 if(!name.size() || g.name(i)==name)		
                 {
@@ -619,6 +666,7 @@ class GAEngine
         }
 
 		// build_rnd_sample
+		// IMPORTANT BUT MAY CONTAIN BUGS!
         void build_rnd_sample(std::vector<int>& sample,int count,bool reject_duplicates,bool check_valid)
         {
             double limit=(double)m_Population.size()-0.5;
@@ -628,14 +676,22 @@ class GAEngine
             {
                 int v;
 
-				// do-while loop: randomly assign an int to v 
+				// randomly assign an int to v 
 					// if reject_duplicates true, build_rnd_sample will not add duplicates to sample
                 do
                 {
 					v=(int)(rnd_generate(0.0,limit));	// v in [0, m_Pop.size()-1]
                     if(check_valid && !m_Population[v].valid())
 						continue;		//??if check_valid true, loop until v is a valid Genome? 
-						//(BUG - invalid genomes will still be pushed back onto sample)
+						// TODO (BUG - invalid genomes will still be pushed back onto sample)
+
+					/*// THE FIX BELOW! TODO
+					do
+					{
+						v=(int)(rnd_generate(0.0,limit));	// v in [0, m_Pop.size()-1]
+					}
+					while(check_valid && !m_Population[v].valid())
+					//*/
                 }
                 while(reject_duplicates && std::find(sample.begin(),sample.end(),v)!=sample.end());
                 //Found next value
@@ -680,7 +736,7 @@ class GAEngine
         void build_rnd_sample_rnd(std::vector<int>& sample,double prob,bool check_valid)
         {
 			// if check_valid, only appends indices of m_Population for which Genomes are valid, at given probability (%)
-			// if false (check_valid), appends Genomes at given rate (%)
+			// else (check_valid==false), appends Genomes at given rate (%)
             for(int i=0;i<m_Population.size();i++)
             {
                 if((!check_valid || m_Population[i].valid()) && prob>=rnd_generate(0.0,100.0))
@@ -691,12 +747,12 @@ class GAEngine
 		// select_weighted
         int select_weighted(POPULATION& p)
         {
-            double limit=(double)p.size()-0.5;
+            //double limit=(double)p.size()-0.5;
             double sum=0.0;
 
 			// total sum of population's fitness	(sum is inf if p[i].fitness == 0 or p[i] invalid)
             for(int i=0;i<p.size();i++)
-                sum+=(p[i].valid()?1.0/(p[i].fitness()?p[i].fitness():0.000000000001):99999999999.99999);		// !!!shouldn't summand be 0 if p[i] invalid? (BUG?)
+                sum+=(p[i].valid()?1.0/(p[i].fitness()?p[i].fitness():0.000000000001):99999999999.99999);		// TODO !!!shouldn't summand be 0 if p[i] invalid? (BUG?)
 				// sum+=(p[i].valid()?1.0/(p[i].fitness()?p[i].fitness():0.000000000001):0.0);
 
 			// use a randomly selected threshold for cum-sum to select i
